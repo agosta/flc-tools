@@ -12,9 +12,10 @@ class MachineNetPilot(mn.MachineNet):
     return [ n for n in [ self[m].nodes for m in self ] if n.name==name][0]
       
   def isNullable(self, state):
+    '''Epsilon moves are untested!'''
     if state.final : return True
     for n in state.to : 
-      if state.to[n]=='&epsilon' and self.isNullable(n) : return True
+      if state.to[n]=='&epsilon;' and self.isNullable(n) : return True
     return False
 
   def compute_initials(self):
