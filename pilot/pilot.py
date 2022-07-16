@@ -1,9 +1,25 @@
 #!/usr/bin/python3
 
+__doc__ = '''This module implements the generation of the LR pilot automaton from a machine net representation of the grammar.
+The input machine net is represented by a graphviz dot file. 
+See the build_pilot function documentation for more details.
+
+Global variables:
+  index  used to provide the numbering of macro-states
+
+(todo: move to Python 3.9 so we can document this)
+'''
+
 import mnet as mn
+import dot2tex
+
 index = 0
 
+
 class MachineNetPilot(mn.MachineNet):
+  '''Extension of the generic machine net with properties needed to compute the pilot:
+  - Computation of the Initials
+  - isNullable property'''
   def get_states(self):
     return sum([ self[m].nodes for m in self ],[])
 
@@ -12,17 +28,20 @@ class MachineNetPilot(mn.MachineNet):
     return [ n for n in [ self[m].nodes for m in self ] if n.name==name][0]
       
   def isNullable(self, state):
-    '''Epsilon moves are untested!'''
+    '''Check whether a state is nullable.
+    Note: Epsilon moves are untested!'''
     if state.final : return True
     for n in state.to : 
       if state.to[n]=='&epsilon;' and self.isNullable(n) : return True
     return False
 
   def compute_initials(self):
+    '''Compute initials for a all states'''
     for s in self.get_states():
       self.initials(s)
 
   def initials(self, state):
+    '''Compute and return initials for a single state'''
     #print("Ini({})".format(state.name))
     edge_labels_term = [ l for n, l in state.get_arcs() if l not in self.keys() ]
     edge_labels_nonterm = [ l for n, l in state.get_arcs() if l in self.keys() ]
@@ -34,6 +53,8 @@ class MachineNetPilot(mn.MachineNet):
     return state.ini
 
   def print_initials(self):
+    '''Print out the initials of all states. 
+    Note: method compute_initials should be called before calling the print method.'''
     print("Initials")
     for s in self.get_states():
       print("  Ini("+s.name+'): {',end=" ")
@@ -42,6 +63,7 @@ class MachineNetPilot(mn.MachineNet):
       print('}')
 
 class Item(object):
+  '''Class representing a candidate or item for the pilot'''
   def __init__(self,state,la):
     self.state=state
     self.la=la
@@ -66,13 +88,15 @@ class Item(object):
      return "{}, {}".format(name,self.la)
 
 class MacroState(mn.Node):
+  '''Class representing a macro-state, or a set of items, closed under the closure operation. 
+  Note: the closure is computed during the initialization'''
   def __init__(self,base, machine_net):
     self.base=set(base)
     self.mn=machine_net
     self.closure=set()
     self.get_closure()
     global index
-    self.name="I{}".format(index)
+    self.name="I{}".format(index) #TODO: The index should actually be set only if the macro-state is not merged with another
     index+=1
     self.label=self.name
     self.to={}
@@ -98,6 +122,7 @@ class MacroState(mn.Node):
     return res
 
   def get_closure(self):
+    '''Computes the closure of the macro-state according to the algorithm seen in class'''
     for item in self.base:
       state=item.state
       la=item.la
@@ -130,6 +155,7 @@ class MacroState(mn.Node):
     return self.base|self.closure
 
 class Pilot(mn.Machine):
+   '''Subclass of Machine used to represent the Pilot. It represents a single graph/automaton, and the nodes must be of type MacroState.'''
    def __init__(self, machine_net):
      self.name='pilot'
      self.mn=machine_net
@@ -178,12 +204,38 @@ class Pilot(mn.Machine):
      return res + ' init{} -> {}'.format(self.name, self.get_initial().name)+'\n}'
   
 
-if __name__ == '__main__':
-  M = MachineNetPilot("gram0.dot")
+def basename(s):
+  '''Support function for removing the extension from file names'''
+  return ".".join(s.split(".")[:-1])
+
+def build_pilot(input_graph="gram0.dot", output_graph="pilot.dot", latex=True):
+  '''Driver function for building the pilot out of a graphviz file representing a machine net.
+  How to write the graphviz file: 
+  - The axiom machine must be named S; machine names are implicit and derived from the state names, which must follow the pattern described below
+  - Machines must labeled with nonterminals (a single uppercase letter NonTerm): initial states are marked by a transition from an invisible state named init+NonTerm name, states are names NonTerm + number
+  - Epsilon moves must labeled "&epsilon;"
+  - Other moves must be labeled with a terminal (a single lowercase letter) or nonterminal (a single uppercase letter that is used as the name of a machine)
+  - The tap must be denoted as "-\|"
+
+  Note: the latex output is highly experimental -- i.e., at the moment it just dumps the current version of the dot file into tex via dot2tex. The dot needs to be modified to better support the tex output.
+  ''' 
+  M = MachineNetPilot(input_graph)
   M.compute_initials()
   M.print_initials()
   pilot=Pilot(M)
   pilot.build()
-  with open("pilot.dot","w") as fout:
+  with open(output_graph,"w") as fout:
     fout.write(str(pilot))
+  if latex: 
+    in_graph=''
+    with open(input_graph,"r") as fin:
+       in_graph=fin.read()
+    tex_in = dot2tex.dot2tex(in_graph, format='tikz', crop=True)
+    tex_out = dot2tex.dot2tex(str(pilot), format='tikz', crop=True)
+    with open(basename(input_graph)+'.tex','w') as fout:
+       fout.write(tex_in)
+    with open(basename(output_graph)+'.tex','w') as fout:
+       fout.write(tex_out)
 
+if __name__ == '__main__':
+  build_pilot()
