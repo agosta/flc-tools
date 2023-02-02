@@ -123,9 +123,7 @@ class MacroState(mn.Node):
     return res
 
   def get_closure(self):
-    '''Computes the closure of the macro-state according to the algorithm seen in class
-Bug: there is a problem with the computation of the lookahead of the closure.
-'''
+    '''Computes the closure of the macro-state according to the algorithm seen in class.'''
     for item in self.base:
       state=item.state
       la=item.la
