@@ -98,6 +98,7 @@ class MachineNet(dict):
   def from_dot(self,fname="gram0.dot"):
     G = nx.nx_pydot.read_dot(fname)
     for c in nx.weakly_connected_components(G):
+      print(c)
       current = None
       for n in c :
         if 'init' in n :
@@ -131,6 +132,11 @@ class MachineNet(dict):
       except Exception: pass
     return name
 
-if __name__ == '__main__':
-  G = MachineNet("gram0.dot")
-  G.to_dot()
+if __name__ == '__main__': 
+  g = "gram0.dot"
+  from sys import argv
+  if len(argv)>1 : g = argv[-1]
+  print(g)
+  G = MachineNet(g)
+  outname = g.split(".")[0]+'.out.dot'
+  G.to_dot(outname)

@@ -42,11 +42,12 @@ class MachineNetPilot(mn.MachineNet):
 
   def initials(self, state):
     '''Compute and return initials for a single state'''
-    #print("Ini({})".format(state.name))
+    print("Ini({})".format(state.name))
     edge_labels_term = [ l for n, l in state.get_arcs() if l not in self.keys() ]
     edge_labels_nonterm = [ l for n, l in state.get_arcs() if l in self.keys() ]
     edges_and_labels_nonterm = [ (n, l) for n, l in state.get_arcs() if l in self.keys() ]
     clause1 = set(edge_labels_term)
+    print('--------',[ (s, self[s].get_initial()) for s in edge_labels_nonterm])
     clause2 = set().union(*[ self.initials(self[s].get_initial()) for s in edge_labels_nonterm ])
     clause3 = set([ self.initials(n) for n, s in edges_and_labels_nonterm if self.isNullable(self[s].get_initial()) ])
     state.ini = clause1|clause2|clause3
@@ -122,18 +123,20 @@ class MacroState(mn.Node):
     return res
 
   def get_closure(self):
-    '''Computes the closure of the macro-state according to the algorithm seen in class'''
+    '''Computes the closure of the macro-state according to the algorithm seen in class
+Bug: there is a problem with the computation of the lookahead of the closure.
+'''
     for item in self.base:
       state=item.state
       la=item.la
       edges_and_labels_nonterm = [ (n, l) for n, l in self.mn.get_node(state).get_arcs() if l in self.mn.keys() ]
       for n, l in edges_and_labels_nonterm :
-        n=self.mn.get_node(n)
-        if self.mn.isNullable(n) :
+        node=self.mn.get_node(n)
+        print("TEST", state, node, n, l, node.ini, self.mn.isNullable(node), la)
+        if self.mn.isNullable(node) :
           self.closure.add(Item(self.mn[l].get_initial(), la))
-        else :
-          for b in n.ini:
-            self.closure.add(Item(self.mn[l].get_initial(), b))
+        for b in node.ini:
+          self.closure.add(Item(self.mn[l].get_initial(), b))
     length=len(self.closure)
     while True :
       for item in self.closure :
@@ -141,12 +144,11 @@ class MacroState(mn.Node):
         la=item.la
         edges_and_labels_nonterm = [ (n, l) for n, l in state.get_arcs() if l in self.mn.keys() ]
         for n, l in edges_and_labels_nonterm :
-          n=self.get_node(n)
-          if self.isNullable(n) :
+          node=self.get_node(n)
+          if self.isNullable(node) :
             self.closure.add(Item(self.mn[l].get_initial(), la))
-          else :
-            for b in n.ini():
-              self.closure.add(Item(self.mn[l].get_initial(), b))
+          for b in node.ini():
+            self.closure.add(Item(self.mn[l].get_initial(), b))
       if len(self.closure)>length : length=len(self.closure)
       else : return
 
@@ -238,4 +240,9 @@ def build_pilot(input_graph="gram0.dot", output_graph="pilot.dot", latex=True):
        fout.write(tex_out)
 
 if __name__ == '__main__':
-  build_pilot()
+  g = "gram0.dot"
+  from sys import argv
+  if len(argv)>1 : g = argv[-1]
+  print(g)
+  outname = g.split(".")[0]+'.pilot.dot'
+  build_pilot(g, outname)
